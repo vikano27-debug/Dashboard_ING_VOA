@@ -47,7 +47,6 @@
         .top10-table th { background: #edf2f7; padding: 4px; text-align: left; }
         .top10-table td { padding: 4px; border-bottom: 1px solid #edf2f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
         
-        /* AQUI LA NUEVA CUADRICULA COMPACTADA: 40% - 40% - 20% */
         .tables-grid-3 { display: grid; grid-template-columns: 2.2fr 2.2fr 1fr; gap: 12px; margin-bottom: 15px; align-items: start; }
         @media (max-width: 1024px) { .tables-grid-3 { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 768px) { .tables-grid-3 { grid-template-columns: 1fr; } }
@@ -59,7 +58,6 @@
         table.main-table th { background: #edf2f7; color: #4a5568; font-weight: bold; padding: 8px; text-align: left; position: sticky; top: 0; z-index: 1; }
         table.main-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        /* Estilo para las nuevas columnas con OS */
         .col-os { max-width: 130px; white-space: normal !important; word-wrap: break-word; font-size: 9.5px; color: #4a5568; line-height: 1.3; }
 
         .chart-header { font-size: 12px; font-weight: bold; margin-bottom: 8px; color: var(--primary); border-bottom: 1px solid #edf2f7; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
@@ -90,7 +88,7 @@
 
     <div class="config-bar">
         <div>
-            <button class="btn-panel" onclick="document.getElementById('bdiInput').click()">⚙️ Cargar BDI / Tipos OS</button>
+            <button class="btn-panel" onclick="document.getElementById('bdiInput').click()">⚙️ Cargar BDI / Tipos OS Manual</button>
             <button class="btn-panel btn-info" onclick="cargarDatosDesdeGithub()" style="margin-left: 10px;">🔄 Forzar Sincronización</button>
         </div>
         <div class="cloud-status">
@@ -234,15 +232,11 @@
     </div>
 
 <script>
-    // ========================================================
-    // CONFIGURACIÓN CLOUD (GITHUB RAW LINKS)
-    // ========================================================
     const GITHUB_USER = "vikano27-debug";
     const GITHUB_REPO = "Dashboard_ING_VOA";
     const GITHUB_BRANCH = "main";
     const INTERVALO_REFRESH = 15 * 60 * 1000; 
 
-    // ========================================================
     const S = v => v === null || v === undefined ? "" : String(v).trim();
     const U = v => S(v).toUpperCase();
     const UN = v => U(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -255,7 +249,7 @@
     
     let rawSipremData = [];
     let datosDisponiblesLimpias = {};
-    let datosCasuisticaTbl = {}; // Se hizo global para poder exportar
+    let datosCasuisticaTbl = {}; 
     let nucleosObj = {};
     let listadoSinNucleo = [];
     let conteoTotalProceso = {};
@@ -271,20 +265,64 @@
     function actualizarEstadosUI() {
         let bCount = Object.keys(bdiMap).length;
         let lbl = document.getElementById('estadoBdi');
-        if(bCount > 0) { lbl.innerText = `🧠 BDI Activa: ${bCount} Barrios`; lbl.style.color = '#38a169'; }
+        if(bCount > 0) { 
+            lbl.innerText = `🧠 BDI Activa: ${bCount} Barrios`; 
+            lbl.style.color = '#38a169'; 
+        } else {
+            lbl.innerText = `⚠️ Sin BDI Activa`;
+            lbl.style.color = '#e53e3e';
+        }
     }
 
-    // ========================================================
+    function procesarBdiArrayBuffer(arrayBuffer) {
+        let wb = XLSX.read(new Uint8Array(arrayBuffer), {type:'array'});
+        bdiMap = {};
+        tiposOsMap = {};
+        wb.SheetNames.forEach(name => {
+            let rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:""});
+            rows.forEach(r => {
+                let cleanR = {};
+                for(let k in r) { cleanR[ALPHANUM(k)] = U(r[k]); }
+                let bKey = Object.keys(cleanR).find(k => ["NOMLOCAL", "LOCALIDAD", "BARRIO"].includes(k));
+                let iKey = Object.keys(cleanR).find(k => ["INGAIRE", "INGENIERO", "NUCLEO"].includes(k));
+                if(bKey && iKey) { bdiMap[ALPHANUM(cleanR[bKey])] = cleanR[iKey]; }
+                let tKey = Object.keys(cleanR).find(k => ["TIPO", "TIPORDEN", "TO"].includes(k));
+                let dKey = Object.keys(cleanR).find(k => ["DESCTIPO", "DESCRIPCION"].includes(k));
+                let nKey = Object.keys(cleanR).find(k => ["NATURALEZA", "PROCESO"].includes(k));
+                if(tKey && dKey) { tiposOsMap[cleanR[tKey]] = { desc: cleanR[dKey], nat: nKey ? cleanR[nKey] : "" }; }
+            });
+        });
+        localStorage.setItem('bdi_v15', JSON.stringify(bdiMap));
+        localStorage.setItem('tipos_v15', JSON.stringify(tiposOsMap));
+        actualizarEstadosUI();
+    }
+
     async function cargarDatosDesdeGithub() {
         let badge = document.getElementById('badgeSync');
         badge.className = "sync-badge loading";
         badge.innerText = "☁️ Conectando con GitHub...";
 
         let ts = new Date().getTime(); 
+        let urlBdi = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/bdi_latest.xlsx?t=${ts}`;
         let urlCasuistica = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/casuistica_latest.csv?t=${ts}`;
         let urlSiprem = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/siprem_latest.xlsx?t=${ts}`;
 
         try {
+            // 1. Intentar cargar BDI Automática desde la Nube
+            try {
+                let resBdi = await fetch(urlBdi);
+                if(resBdi.ok) {
+                    let abBdi = await resBdi.arrayBuffer();
+                    procesarBdiArrayBuffer(abBdi);
+                } else {
+                    actualizarEstadosUI();
+                }
+            } catch(eBdi) {
+                console.warn("BDI no encontrada en la nube, usando localstorage.", eBdi);
+                actualizarEstadosUI();
+            }
+
+            // 2. Cargar Casuística
             document.getElementById('msgCasuistica').innerText = "⏳ Descargando CSV de la nube...";
             let resCas = await fetch(urlCasuistica);
             if(resCas.ok) {
@@ -294,6 +332,7 @@
                 procesarDatosCasuisticaDirecto(rowsCas);
             }
 
+            // 3. Cargar SIPREM
             document.getElementById('msgSiprem').innerText = "⏳ Descargando XLSX de la nube...";
             let resSip = await fetch(urlSiprem);
             if(resSip.ok) {
@@ -357,25 +396,8 @@
         if(!e.target.files.length) return;
         let reader = new FileReader();
         reader.onload = (ev) => {
-            let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
-            wb.SheetNames.forEach(name => {
-                let rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:""});
-                rows.forEach(r => {
-                    let cleanR = {};
-                    for(let k in r) { cleanR[ALPHANUM(k)] = U(r[k]); }
-                    let bKey = Object.keys(cleanR).find(k => ["NOMLOCAL", "LOCALIDAD", "BARRIO"].includes(k));
-                    let iKey = Object.keys(cleanR).find(k => ["INGAIRE", "INGENIERO", "NUCLEO"].includes(k));
-                    if(bKey && iKey) { bdiMap[ALPHANUM(cleanR[bKey])] = cleanR[iKey]; }
-                    let tKey = Object.keys(cleanR).find(k => ["TIPO", "TIPORDEN", "TO"].includes(k));
-                    let dKey = Object.keys(cleanR).find(k => ["DESCTIPO", "DESCRIPCION"].includes(k));
-                    let nKey = Object.keys(cleanR).find(k => ["NATURALEZA", "PROCESO"].includes(k));
-                    if(tKey && dKey) { tiposOsMap[cleanR[tKey]] = { desc: cleanR[dKey], nat: nKey ? cleanR[nKey] : "" }; }
-                });
-            });
-            localStorage.setItem('bdi_v15', JSON.stringify(bdiMap));
-            localStorage.setItem('tipos_v15', JSON.stringify(tiposOsMap));
-            alert("✅ BDI actualizado localmente.");
-            actualizarEstadosUI();
+            procesarBdiArrayBuffer(ev.target.result);
+            alert("✅ BDI actualizado localmente en este navegador.");
             if(rawSipremData.length > 0) analizarDatos(rawSipremData);
         };
         reader.readAsArrayBuffer(e.target.files[0]);
@@ -439,7 +461,7 @@
         let top15Listas = { "DAÑOS":[], "CAMPAÑAS":[], "NUEVAS CONEXIONES":[], "PQR":[] };
         
         datosDisponiblesLimpias = {};
-        datosCasuisticaTbl = {}; // Se resetea el global
+        datosCasuisticaTbl = {}; 
         nucleosObj = {};
         listadoSinNucleo = [];
         mapaAsignacionesTecnicos = {};
@@ -475,7 +497,6 @@
             if(traba) {
                 trabadas++;
                 let keyC = `${barrio}|${traba}`;
-                // Guardamos el array de OS para la exportación y visualización
                 if(!datosCasuisticaTbl[keyC]) datosCasuisticaTbl[keyC] = { b: barrio, m: traba, c: 0, osList: [] };
                 datosCasuisticaTbl[keyC].c++;
                 datosCasuisticaTbl[keyC].osList.push(os);
@@ -497,7 +518,6 @@
             else {
                 limpias++;
                 let keyL = `${mun}|${barrio}|${proceso}|${dic.desc}`;
-                // Guardamos el array de OS
                 if(!datosDisponiblesLimpias[keyL]) datosDisponiblesLimpias[keyL] = { m: mun, b: barrio, p: proceso, d: dic.desc, c: 0, osList: [] };
                 datosDisponiblesLimpias[keyL].c++;
                 datosDisponiblesLimpias[keyL].osList.push(os);
@@ -521,7 +541,7 @@
 
         renderTablerosTop15(top15Listas);
         renderOsLimpias();
-        renderCasuisticaTbl(); // Usa el objeto global ahora
+        renderCasuisticaTbl(); 
         renderNucleosTbl();
         renderTecnicosTbl(); 
         filtrarDetalleTecnico();
@@ -636,7 +656,6 @@
         let tbody = document.querySelector('#tableDisponibles tbody');
         let html = "";
         Object.values(datosDisponiblesLimpias).filter(x => f === "TODAS" || x.p === f).sort((a,b)=>b.c - a.c).forEach(x => {
-            // Muestra maximo 3 OS en pantalla para no dañar el diseño, el resto se bajan en el Excel
             let osText = x.osList.slice(0, 3).join(", ") + (x.osList.length > 3 ? "..." : "");
             html += `<tr>
                 <td>${x.m}<br><b>${x.b}</b></td>
@@ -648,7 +667,6 @@
         tbody.innerHTML = html || `<tr><td colspan="4" style="text-align:center; padding:10px;">Bolsa vacía con este filtro</td></tr>`;
     }
 
-    // NUEVO: Función para exportar la bolsa limpia a Excel
     function exportarOsLimpias() {
         let f = document.getElementById('filtroOsLimpias').value;
         let dataToExport = [];
@@ -677,7 +695,6 @@
         tbody.innerHTML = html || `<tr><td colspan="4" style="text-align:center; padding:10px;">Filtros limpios en campo</td></tr>`;
     }
 
-    // NUEVO: Función para exportar las trabadas a Excel
     function exportarOsTrabadas() {
         let dataToExport = [];
         Object.values(datosCasuisticaTbl).forEach(x => {
