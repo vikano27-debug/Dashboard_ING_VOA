@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master Dashboard Operativo - DELTEC V26 (Totales Reales & Ajuste de Matrices)</title>
+    <title>Master Dashboard Operativo - DELTEC V27 (Corrección Matrices)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -85,7 +85,7 @@
 
     <div class="header">
         <h1>Master Dashboard Operativo</h1>
-        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v26 (Matrices Ajustadas)</p>
+        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v27 (Corrección Matemáticas)</p>
     </div>
 
     <div class="config-bar">
@@ -562,6 +562,7 @@
                 matrizAntiguedadBolsa[proceso]["total"]++;
             }
 
+            // Conteo de Trabas Generales (Asignadas o No Asignadas)
             if(esTrabada) {
                 trabadas++;
                 let keyC = `${barrio}|${traba}|${to}`;
@@ -574,16 +575,8 @@
             if(esAsignada) {
                 asignadas++;
                 let registroOrden = { 
-                    os: os, 
-                    tec: tecRaw, 
-                    municipio: mun, 
-                    barrio: barrio, 
-                    ant: ant, 
-                    to: to, 
-                    descTo: dic.desc, 
-                    coment: comentario, 
-                    proceso: proceso,
-                    traba: traba
+                    os: os, tec: tecRaw, municipio: mun, barrio: barrio, ant: ant, 
+                    to: to, descTo: dic.desc, coment: comentario, proceso: proceso, traba: traba
                 };
 
                 top15Listas[proceso].push(registroOrden);
@@ -599,22 +592,25 @@
                 if(proceso === "DAÑOS") tecnicosObj[tecRaw].dan++;
                 if(proceso === "NUEVAS CONEXIONES") tecnicosObj[tecRaw].nvc++;
 
-                // Registro Matriz Actividades
+                // Registro Matriz Actividades (Para las Asignadas)
                 let descClean = dic.desc || to || "OTRA ACTIVIDAD";
                 setActividadesList.add(descClean);
                 if(!matrizActividadesTecnicos[tecRaw]) matrizActividadesTecnicos[tecRaw] = {};
                 matrizActividadesTecnicos[tecRaw][descClean] = (matrizActividadesTecnicos[tecRaw][descClean] || 0) + 1;
             } 
-            else if(!esTrabada) {
-                // Bolsa Limpia Disponible (Sin asignación y Sin traba)
-                limpias++;
-                let keyL = `${mun}|${barrio}|${proceso}|${dic.desc}`;
-                if(!datosDisponiblesLimpias[keyL]) datosDisponiblesLimpias[keyL] = { m: mun, b: barrio, p: proceso, d: dic.desc, c: 0, maxAnt: 0, osList: [] };
-                datosDisponiblesLimpias[keyL].c++;
-                if(ant > datosDisponiblesLimpias[keyL].maxAnt) datosDisponiblesLimpias[keyL].maxAnt = ant;
-                datosDisponiblesLimpias[keyL].osList.push(os);
+            else {
+                // Es "No asignado". Verificamos si es limpia para la tabla de Bolsa
+                if(!esTrabada) {
+                    limpias++;
+                    let keyL = `${mun}|${barrio}|${proceso}|${dic.desc}`;
+                    if(!datosDisponiblesLimpias[keyL]) datosDisponiblesLimpias[keyL] = { m: mun, b: barrio, p: proceso, d: dic.desc, c: 0, maxAnt: 0, osList: [] };
+                    datosDisponiblesLimpias[keyL].c++;
+                    if(ant > datosDisponiblesLimpias[keyL].maxAnt) datosDisponiblesLimpias[keyL].maxAnt = ant;
+                    datosDisponiblesLimpias[keyL].osList.push(os);
+                }
 
-                // Actividades No Asignadas
+                // Registro Matriz Actividades (¡AQUÍ ESTÁ LA CORRECCIÓN!)
+                // Ahora suma TODAS las no asignadas a la Matriz 2 (limpias y trabadas)
                 let descClean = dic.desc || to || "OTRA ACTIVIDAD";
                 setActividadesList.add(descClean);
                 if(!matrizActividadesTecnicos["No asignado"]) matrizActividadesTecnicos["No asignado"] = {};
@@ -717,7 +713,6 @@
 
         let headerHtml = `<tr><th style="text-align:left; min-width:180px;">TÉCNICO / BRIGADA</th>`;
         actArray.forEach(act => {
-            // AJUSTE CLAVE AQUI: Se remueve el substring y se fuerza el texto a acomodarse.
             headerHtml += `<th style="min-width:130px; font-size:9.5px; white-space:normal; word-break:break-word; vertical-align:middle; padding:8px 4px;" title="${act}">${act}</th>`;
         });
         headerHtml += `<th style="min-width:60px;">TOTAL</th></tr>`;
