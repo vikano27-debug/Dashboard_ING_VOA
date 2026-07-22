@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master Dashboard Operativo - DELTEC V23 (Optimizacion UI y Exportaciones)</title>
+    <title>Master Dashboard Operativo - DELTEC V24 (Nuevas Conexiones & Antigüedad UI)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -83,7 +83,7 @@
 
     <div class="header">
         <h1>Master Dashboard Operativo</h1>
-        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v23 (Optimizacion UI y OS Detail)</p>
+        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v24 (Optimizacion UI y OS Detail)</p>
     </div>
 
     <div class="config-bar">
@@ -202,7 +202,7 @@
                     <option value="NUEVAS CONEXIONES">Nuevas Conex.</option>
                 </select>
                 <table id="tableDisponibles" class="main-table">
-                    <thead><tr><th>Municipio/Barrio</th><th>Tipo / Proceso</th><th>Órdenes (OS)</th><th style="width:30px;">Q</th></tr></thead>
+                    <thead><tr><th>Municipio/Barrio</th><th>Tipo / Proceso</th><th>Órdenes (OS)</th><th style="width:45px;">Días</th><th style="width:30px;">Q</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -213,7 +213,7 @@
                     <button class="btn-exportar" style="padding:3px 8px; font-size:10px;" onclick="exportarOsTrabadas()">📥 Excel</button>
                 </div>
                 <table id="tableCasuistica" class="main-table">
-                    <thead><tr><th>Barrio</th><th>Motivo Traba</th><th>Órdenes (OS)</th><th style="width:30px;">Q</th></tr></thead>
+                    <thead><tr><th>Barrio</th><th>Tipo</th><th>Motivo Traba</th><th>Órdenes (OS)</th><th style="width:45px;">Días</th><th style="width:30px;">Q</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -308,7 +308,6 @@
         let urlSiprem = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/siprem_latest.xlsx?t=${ts}`;
 
         try {
-            // 1. Intentar cargar BDI Automática desde la Nube
             try {
                 let resBdi = await fetch(urlBdi);
                 if(resBdi.ok) {
@@ -322,7 +321,6 @@
                 actualizarEstadosUI();
             }
 
-            // 2. Cargar Casuística
             document.getElementById('msgCasuistica').innerText = "⏳ Descargando CSV de la nube...";
             let resCas = await fetch(urlCasuistica);
             if(resCas.ok) {
@@ -332,7 +330,6 @@
                 procesarDatosCasuisticaDirecto(rowsCas);
             }
 
-            // 3. Cargar SIPREM
             document.getElementById('msgSiprem').innerText = "⏳ Descargando XLSX de la nube...";
             let resSip = await fetch(urlSiprem);
             if(resSip.ok) {
@@ -448,11 +445,12 @@
         return coincidencia ? bdiMap[coincidencia] : "SIN NUCLEO";
     }
 
+    // MEJORA: Clasificación extendida para incluir TO154, TO157 y otros tipos de Nuevas Conexiones
     function clasificarProceso(to, desc, nat) {
         let m = U(to + " " + desc + " " + nat);
         if(m.includes("TO811") || m.includes("DAÑO") || m.includes("DANO")) return "DAÑOS";
         if(["TO250","TO253","TO255","TO279","TO283","TO280"].some(x => m.includes(x)) || m.includes("CAMP")) return "CAMPAÑAS";
-        if(["TO102","TO153"].some(x => m.includes(x)) || m.includes("NUEV") || m.includes("CONEX")) return "NUEVAS CONEXIONES";
+        if(["TO102","TO150","TO151","TO152","TO153","TO154","TO155","TO156","TO157"].some(x => m.includes(x)) || m.includes("NUEV") || m.includes("CONEX") || m.includes("INSTALAC")) return "NUEVAS CONEXIONES";
         return "PQR";
     }
 
@@ -496,9 +494,10 @@
             
             if(traba) {
                 trabadas++;
-                let keyC = `${barrio}|${traba}`;
-                if(!datosCasuisticaTbl[keyC]) datosCasuisticaTbl[keyC] = { b: barrio, m: traba, c: 0, osList: [] };
+                let keyC = `${barrio}|${traba}|${to}`;
+                if(!datosCasuisticaTbl[keyC]) datosCasuisticaTbl[keyC] = { b: barrio, m: traba, to: to || "S/T", c: 0, maxAnt: 0, osList: [] };
                 datosCasuisticaTbl[keyC].c++;
+                if(ant > datosCasuisticaTbl[keyC].maxAnt) datosCasuisticaTbl[keyC].maxAnt = ant;
                 datosCasuisticaTbl[keyC].osList.push(os);
             } 
             else if(esAsignada) {
@@ -518,8 +517,9 @@
             else {
                 limpias++;
                 let keyL = `${mun}|${barrio}|${proceso}|${dic.desc}`;
-                if(!datosDisponiblesLimpias[keyL]) datosDisponiblesLimpias[keyL] = { m: mun, b: barrio, p: proceso, d: dic.desc, c: 0, osList: [] };
+                if(!datosDisponiblesLimpias[keyL]) datosDisponiblesLimpias[keyL] = { m: mun, b: barrio, p: proceso, d: dic.desc, c: 0, maxAnt: 0, osList: [] };
                 datosDisponiblesLimpias[keyL].c++;
+                if(ant > datosDisponiblesLimpias[keyL].maxAnt) datosDisponiblesLimpias[keyL].maxAnt = ant;
                 datosDisponiblesLimpias[keyL].osList.push(os);
             }
 
@@ -639,18 +639,16 @@
         XLSX.writeFile(wb, `OS_${tec.replace(/[^A-Z0-9]/gi, '_')}.xlsx`);
     }
 
-  function renderTablerosTop15(listas) {
+    function renderTablerosTop15(listas) {
         let procesos = ["DAÑOS", "CAMPAÑAS", "NUEVAS CONEXIONES", "PQR"];
         
         procesos.forEach(p => {
             let container = document.getElementById(`top15-${p}`);
             if(!container) return;
 
-            // Ordena por antigüedad de mayor a menor y saca el Top 15
             let data = listas[p].sort((a, b) => b.ant - a.ant).slice(0, 15);
             let totalOs = listas[p].length;
 
-            // ACÁ ESTÁ LA MAGIA: Agregamos el <th>Barrio</th> al encabezado
             let html = `<h4>${p} <span style="float:right; color:#718096; font-size:10px;">(${totalOs})</span></h4>
                         <table class="top10-table">
                             <thead>
@@ -666,7 +664,6 @@
             if(data.length === 0) {
                 html += `<tr><td colspan="4" style="text-align:center;">Sin órdenes antiguas</td></tr>`;
             } else {
-                // ACÁ ESTÁ LA MAGIA 2: Inyectamos el ${item.barrio} en la fila
                 data.forEach(item => {
                     let textClass = item.ant >= 5 ? 'color: #e53e3e;' : (item.ant > 2 ? 'color: #d69e2e;' : 'color: #38a169;');
                     html += `<tr>
@@ -682,20 +679,23 @@
         });
     }
 
+    // MEJORA: Se agregó la columna Antigüedad (Días)
     function renderOsLimpias() {
         let f = document.getElementById('filtroOsLimpias').value;
         let tbody = document.querySelector('#tableDisponibles tbody');
         let html = "";
         Object.values(datosDisponiblesLimpias).filter(x => f === "TODAS" || x.p === f).sort((a,b)=>b.c - a.c).forEach(x => {
             let osText = x.osList.slice(0, 3).join(", ") + (x.osList.length > 3 ? "..." : "");
+            let badgeAnt = x.maxAnt >= 5 ? 'badge-red' : (x.maxAnt > 2 ? 'badge-yellow' : 'badge-green');
             html += `<tr>
                 <td>${x.m}<br><b>${x.b}</b></td>
                 <td><span class="badge badge-blue">${x.p}</span><br><small>${x.d.substring(0,25)}</small></td>
                 <td class="col-os">${osText}</td>
+                <td><span class="badge ${badgeAnt}">${x.maxAnt} d</span></td>
                 <td><b>${x.c}</b></td>
             </tr>`;
         });
-        tbody.innerHTML = html || `<tr><td colspan="4" style="text-align:center; padding:10px;">Bolsa vacía con este filtro</td></tr>`;
+        tbody.innerHTML = html || `<tr><td colspan="5" style="text-align:center; padding:10px;">Bolsa vacía con este filtro</td></tr>`;
     }
 
     function exportarOsLimpias() {
@@ -703,7 +703,7 @@
         let dataToExport = [];
         Object.values(datosDisponiblesLimpias).filter(x => f === "TODAS" || x.p === f).forEach(x => {
             x.osList.forEach(os => {
-                dataToExport.push({"OS": os, "Municipio": x.m, "Barrio": x.b, "Proceso": x.p, "Actividad": x.d});
+                dataToExport.push({"OS": os, "Municipio": x.m, "Barrio": x.b, "Proceso": x.p, "Actividad": x.d, "Antigüedad (Días)": x.maxAnt});
             });
         });
         if(dataToExport.length === 0) return alert("La bolsa está vacía, no hay datos para descargar.");
@@ -712,25 +712,29 @@
         XLSX.writeFile(wb, `Bolsa_OS_Limpias_${f}.xlsx`);
     }
 
+    // MEJORA: Se agregaron las columnas Tipo (TO) y Antigüedad (Días)
     function renderCasuisticaTbl() {
         let tbody = document.querySelector('#tableCasuistica tbody');
         let html = Object.values(datosCasuisticaTbl).sort((a,b)=>b.c - a.c).map(x => {
             let osText = x.osList.slice(0, 3).join(", ") + (x.osList.length > 3 ? "..." : "");
+            let badgeAnt = x.maxAnt >= 5 ? 'badge-red' : (x.maxAnt > 2 ? 'badge-yellow' : 'badge-green');
             return `<tr>
-                <td>${x.b}</td>
+                <td><b>${x.b}</b></td>
+                <td><span class="badge badge-dark">${x.to}</span></td>
                 <td style="color:var(--accent); font-weight:bold;">${x.m}</td>
                 <td class="col-os">${osText}</td>
+                <td><span class="badge ${badgeAnt}">${x.maxAnt} d</span></td>
                 <td><span class="badge badge-red">${x.c}</span></td>
             </tr>`;
         }).join("");
-        tbody.innerHTML = html || `<tr><td colspan="4" style="text-align:center; padding:10px;">Filtros limpios en campo</td></tr>`;
+        tbody.innerHTML = html || `<tr><td colspan="6" style="text-align:center; padding:10px;">Filtros limpios en campo</td></tr>`;
     }
 
     function exportarOsTrabadas() {
         let dataToExport = [];
         Object.values(datosCasuisticaTbl).forEach(x => {
             x.osList.forEach(os => {
-                dataToExport.push({"OS": os, "Barrio": x.b, "Motivo Traba (Casuística)": x.m});
+                dataToExport.push({"OS": os, "Barrio": x.b, "Tipo (TO)": x.to, "Motivo Traba (Casuística)": x.m, "Antigüedad (Días)": x.maxAnt});
             });
         });
         if(dataToExport.length === 0) return alert("No hay órdenes trabadas en terreno para descargar.");
