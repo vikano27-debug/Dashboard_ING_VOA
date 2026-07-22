@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master Dashboard Operativo - DELTEC V25 (Top Trabas & Matrices Bolsa/Asignación)</title>
+    <title>Master Dashboard Operativo - DELTEC V26 (Totales Reales & Ajuste de Matrices)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -85,7 +85,7 @@
 
     <div class="header">
         <h1>Master Dashboard Operativo</h1>
-        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v25 (Top Trabas & Matrices Bolsa/Asignación)</p>
+        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v26 (Matrices Ajustadas)</p>
     </div>
 
     <div class="config-bar">
@@ -124,10 +124,10 @@
             <div class="kpi-card danger"><span class="kpi-title">Con Casuística / Traba</span><span class="kpi-value" id="kpiCasuistica">0</span></div>
         </div>
 
-        <!-- RESUMEN MATRIZ 1: ANTIGÜEDAD BOLSA (NUEVO MOSTRADO DE LA IMAGEN 1) -->
+        <!-- RESUMEN MATRIZ 1: ANTIGÜEDAD TOTAL (PENDIENTES TOTALES) -->
         <div class="section-title">
-            <span>📅 Resumen 1: Matriz de Antigüedad - Órdenes en Bolsa Limpia</span>
-            <button class="btn-exportar btn-info" onclick="capturarPantalla('boxCapturaMatrizAntiguedad', 'MATRIZ_ANTIGUEDAD_BOLSA')">📸 Capturar Resumen</button>
+            <span>📅 Resumen 1: Matriz de Antigüedad - Órdenes Totales Pendientes por Ejecutar</span>
+            <button class="btn-exportar btn-info" onclick="capturarPantalla('boxCapturaMatrizAntiguedad', 'MATRIZ_ANTIGUEDAD_TOTAL')">📸 Capturar Resumen</button>
         </div>
         <div id="boxCapturaMatrizAntiguedad" class="tech-filter-zone screenshot-target">
             <table id="tableMatrizAntiguedad" class="main-table">
@@ -148,7 +148,7 @@
             </table>
         </div>
 
-        <!-- RESUMEN MATRIZ 2: ASIGNACIÓN POR ACTIVIDAD/DESCRIPCIÓN (NUEVO MOSTRADO DE LA IMAGEN 2) -->
+        <!-- RESUMEN MATRIZ 2: ASIGNACIÓN POR ACTIVIDAD/DESCRIPCIÓN -->
         <div class="section-title">
             <span>📋 Resumen 2: Matriz de Asignaciones por Actividades (Descripción de OS)</span>
             <button class="btn-exportar btn-info" onclick="capturarPantalla('boxCapturaMatrizActividades', 'MATRIZ_ACTIVIDADES_TECNICOS')">📸 Capturar Resumen</button>
@@ -547,6 +547,21 @@
             let traba = casuisticaMap.get(osClean) || "";
             let esTrabada = !!traba;
 
+            // Matriz de Antigüedad para TODAS LAS ÓRDENES (Backlog Total)
+            let bK = "1";
+            if(ant <= 1) bK = "1"; // 0 o 1 caen acá
+            else if(ant === 2) bK = "2";
+            else if(ant === 3) bK = "3";
+            else if(ant === 4) bK = "4";
+            else if(ant >= 5 && ant <= 9) bK = "5~9";
+            else if(ant >= 10 && ant <= 20) bK = "10~20";
+            else bK = ">20";
+
+            if(matrizAntiguedadBolsa[proceso]) {
+                matrizAntiguedadBolsa[proceso][bK]++;
+                matrizAntiguedadBolsa[proceso]["total"]++;
+            }
+
             if(esTrabada) {
                 trabadas++;
                 let keyC = `${barrio}|${traba}|${to}`;
@@ -556,7 +571,6 @@
                 datosCasuisticaTbl[keyC].osList.push(os);
             }
 
-            // MEJORA CLAVE: Si está ASIGNADA, siempre entra a Brigada y Top 15 (así tenga casuística)
             if(esAsignada) {
                 asignadas++;
                 let registroOrden = { 
@@ -599,21 +613,6 @@
                 datosDisponiblesLimpias[keyL].c++;
                 if(ant > datosDisponiblesLimpias[keyL].maxAnt) datosDisponiblesLimpias[keyL].maxAnt = ant;
                 datosDisponiblesLimpias[keyL].osList.push(os);
-
-                // Matriz de Antigüedad para la Bolsa Limpia
-                let bK = "1";
-                if(ant === 1) bK = "1";
-                else if(ant === 2) bK = "2";
-                else if(ant === 3) bK = "3";
-                else if(ant === 4) bK = "4";
-                else if(ant >= 5 && ant <= 9) bK = "5~9";
-                else if(ant >= 10 && ant <= 20) bK = "10~20";
-                else bK = ">20";
-
-                if(matrizAntiguedadBolsa[proceso]) {
-                    matrizAntiguedadBolsa[proceso][bK]++;
-                    matrizAntiguedadBolsa[proceso]["total"]++;
-                }
 
                 // Actividades No Asignadas
                 let descClean = dic.desc || to || "OTRA ACTIVIDAD";
@@ -667,7 +666,7 @@
         document.getElementById('dashboardContent').style.display = 'block';
     }
 
-    // RESUMEN 1: MATRIZ DE ANTIGÜEDAD BOLSA (Imagen 1)
+    // RESUMEN 1: MATRIZ DE ANTIGÜEDAD BOLSA (Total Pendientes)
     function renderMatrizAntiguedadBolsa() {
         let tbody = document.querySelector('#tableMatrizAntiguedad tbody');
         let html = "";
@@ -692,7 +691,7 @@
         });
 
         html += `<tr class="total-row">
-            <td style="text-align:left;">TOTAL BOLSA</td>
+            <td style="text-align:left;">TOTAL PENDIENTES</td>
             <td>${tot["1"]}</td>
             <td>${tot["2"]}</td>
             <td>${tot["3"]}</td>
@@ -706,7 +705,7 @@
         tbody.innerHTML = html;
     }
 
-    // RESUMEN 2: MATRIZ DE ACTIVIDADES / DESCRIPCIÓN POR TÉCNICO (Imagen 2)
+    // RESUMEN 2: MATRIZ DE ACTIVIDADES / DESCRIPCIÓN POR TÉCNICO
     function renderMatrizActividades() {
         let thead = document.querySelector('#tableMatrizActividades thead');
         let tbody = document.querySelector('#tableMatrizActividades tbody');
@@ -718,13 +717,13 @@
 
         let headerHtml = `<tr><th style="text-align:left; min-width:180px;">TÉCNICO / BRIGADA</th>`;
         actArray.forEach(act => {
-            headerHtml += `<th style="min-width:110px; font-size:9.5px;" title="${act}">${act.substring(0,25)}</th>`;
+            // AJUSTE CLAVE AQUI: Se remueve el substring y se fuerza el texto a acomodarse.
+            headerHtml += `<th style="min-width:130px; font-size:9.5px; white-space:normal; word-break:break-word; vertical-align:middle; padding:8px 4px;" title="${act}">${act}</th>`;
         });
         headerHtml += `<th style="min-width:60px;">TOTAL</th></tr>`;
         thead.innerHTML = headerHtml;
 
         let techList = Object.keys(matrizActividadesTecnicos).sort();
-        // Colocar "No asignado" al principio si existe
         if(techList.includes("No asignado")) {
             techList = ["No asignado", ...techList.filter(t => t !== "No asignado")];
         }
