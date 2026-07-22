@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master Dashboard Operativo - DELTEC V24 (Nuevas Conexiones & Antigüedad UI)</title>
+    <title>Master Dashboard Operativo - DELTEC V25 (Top Trabas & Matrices Bolsa/Asignación)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -55,9 +55,11 @@
         .table-card.wide-card { max-height: 600px; grid-column: 1 / -1; } 
         
         table.main-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
-        table.main-table th { background: #edf2f7; color: #4a5568; font-weight: bold; padding: 8px; text-align: left; position: sticky; top: 0; z-index: 1; }
-        table.main-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        
+        table.main-table th { background: #004a99; color: #ffffff; font-weight: bold; padding: 6px; text-align: center; position: sticky; top: 0; z-index: 1; border: 1px solid #003366; }
+        table.main-table td { padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        table.main-table tr.total-row { background: #1a365d; color: #ffffff; font-weight: bold; }
+        table.main-table tr.total-row td { border-color: #2a4365; }
+
         .col-os { max-width: 130px; white-space: normal !important; word-wrap: break-word; font-size: 9.5px; color: #4a5568; line-height: 1.3; }
 
         .chart-header { font-size: 12px; font-weight: bold; margin-bottom: 8px; color: var(--primary); border-bottom: 1px solid #edf2f7; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
@@ -83,13 +85,14 @@
 
     <div class="header">
         <h1>Master Dashboard Operativo</h1>
-        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v24 (Optimizacion UI y OS Detail)</p>
+        <p>Centro de Control Unificado DELTEC - Inteligencia de Datos v25 (Top Trabas & Matrices Bolsa/Asignación)</p>
     </div>
 
     <div class="config-bar">
         <div>
             <button class="btn-panel" onclick="document.getElementById('bdiInput').click()">⚙️ Cargar BDI / Tipos OS Manual</button>
             <button class="btn-panel btn-info" onclick="cargarDatosDesdeGithub()" style="margin-left: 10px;">🔄 Forzar Sincronización</button>
+            <button class="btn-panel btn-danger" onclick="exportarBaseMinableCompleta()" style="margin-left: 10px;">💎 Exportar Base Minable Completa (Excel)</button>
         </div>
         <div class="cloud-status">
             <span id="estadoBdi" class="status-text" style="color: #e53e3e;">⚠️ Sin BDI Local</span>
@@ -121,6 +124,42 @@
             <div class="kpi-card danger"><span class="kpi-title">Con Casuística / Traba</span><span class="kpi-value" id="kpiCasuistica">0</span></div>
         </div>
 
+        <!-- RESUMEN MATRIZ 1: ANTIGÜEDAD BOLSA (NUEVO MOSTRADO DE LA IMAGEN 1) -->
+        <div class="section-title">
+            <span>📅 Resumen 1: Matriz de Antigüedad - Órdenes en Bolsa Limpia</span>
+            <button class="btn-exportar btn-info" onclick="capturarPantalla('boxCapturaMatrizAntiguedad', 'MATRIZ_ANTIGUEDAD_BOLSA')">📸 Capturar Resumen</button>
+        </div>
+        <div id="boxCapturaMatrizAntiguedad" class="tech-filter-zone screenshot-target">
+            <table id="tableMatrizAntiguedad" class="main-table">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">Proceso / Naturaleza</th>
+                        <th>1d</th>
+                        <th>2d</th>
+                        <th>3d</th>
+                        <th>4d</th>
+                        <th>5~9d</th>
+                        <th>10~20d</th>
+                        <th>>20d</th>
+                        <th>TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- RESUMEN MATRIZ 2: ASIGNACIÓN POR ACTIVIDAD/DESCRIPCIÓN (NUEVO MOSTRADO DE LA IMAGEN 2) -->
+        <div class="section-title">
+            <span>📋 Resumen 2: Matriz de Asignaciones por Actividades (Descripción de OS)</span>
+            <button class="btn-exportar btn-info" onclick="capturarPantalla('boxCapturaMatrizActividades', 'MATRIZ_ACTIVIDADES_TECNICOS')">📸 Capturar Resumen</button>
+        </div>
+        <div id="boxCapturaMatrizActividades" class="tech-filter-zone screenshot-target" style="overflow-x:auto;">
+            <table id="tableMatrizActividades" class="main-table">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
         <div class="section-title">📸 Módulo 1: Control Individual por Cuadrilla</div>
         <div class="tech-filter-zone">
             <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
@@ -141,8 +180,8 @@
                     <span id="txtKpisTecnicoCaptura" style="font-weight:bold; font-size:12px; color:#4a5568;">OS Totales: 0 | Max Antigüedad: 0d</span>
                 </div>
                 <table id="tableDetalleIndividual" class="main-table" style="table-layout: auto;">
-                    <thead><tr><th>OS</th><th>Municipio</th><th>Barrio</th><th>TO</th><th>Días</th><th>Observación</th></tr></thead>
-                    <tbody><tr><td colspan="6" style="text-align:center; padding:15px;">Selecciona una cuadrilla</td></tr></tbody>
+                    <thead><tr><th>OS</th><th>Municipio</th><th>Barrio</th><th>TO</th><th>Días</th><th>Estado / Traba</th><th>Observación</th></tr></thead>
+                    <tbody><tr><td colspan="7" style="text-align:center; padding:15px;">Selecciona una cuadrilla</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -177,7 +216,7 @@
             </div>
         </div>
 
-        <div class="section-title">🔴 Top 15 Órdenes Más Antiguas Asignadas</div>
+        <div class="section-title">🔴 Top 15 Órdenes Más Antiguas Asignadas (Incluye Trabas Asignadas)</div>
         <div class="top10-container">
             <div id="top15-DAÑOS" class="top10-card"></div>
             <div id="top15-CAMPAÑAS" class="top10-card"></div>
@@ -202,7 +241,7 @@
                     <option value="NUEVAS CONEXIONES">Nuevas Conex.</option>
                 </select>
                 <table id="tableDisponibles" class="main-table">
-                    <thead><tr><th>Municipio/Barrio</th><th>Tipo / Proceso</th><th>Órdenes (OS)</th><th style="width:45px;">Días</th><th style="width:30px;">Q</th></tr></thead>
+                    <thead><tr><th style="text-align:left;">Municipio/Barrio</th><th style="text-align:left;">Tipo / Proceso</th><th style="text-align:left;">Órdenes (OS)</th><th style="width:45px;">Días</th><th style="width:30px;">Q</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -213,7 +252,7 @@
                     <button class="btn-exportar" style="padding:3px 8px; font-size:10px;" onclick="exportarOsTrabadas()">📥 Excel</button>
                 </div>
                 <table id="tableCasuistica" class="main-table">
-                    <thead><tr><th>Barrio</th><th>Tipo</th><th>Motivo Traba</th><th>Órdenes (OS)</th><th style="width:45px;">Días</th><th style="width:30px;">Q</th></tr></thead>
+                    <thead><tr><th style="text-align:left;">Barrio</th><th>Tipo</th><th style="text-align:left;">Motivo Traba</th><th style="text-align:left;">Órdenes (OS)</th><th style="width:45px;">Días</th><th style="width:30px;">Q</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -224,7 +263,7 @@
                     <button class="btn-exportar btn-danger" style="padding:3px 8px; font-size:10px;" onclick="exportarSinNucleo()">📥 Error</button>
                 </div>
                 <table id="tableCampanasIng" class="main-table">
-                    <thead><tr><th>Ingeniero</th><th style="width:40px;">Cant</th></tr></thead>
+                    <thead><tr><th style="text-align:left;">Ingeniero</th><th style="width:40px;">Cant</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -248,6 +287,7 @@
     let tiposOsMap = {};
     
     let rawSipremData = [];
+    let baseMinableData = []; 
     let datosDisponiblesLimpias = {};
     let datosCasuisticaTbl = {}; 
     let nucleosObj = {};
@@ -255,6 +295,10 @@
     let conteoTotalProceso = {};
     let mapaAsignacionesTecnicos = {};
     let tecnicosObj = {};
+
+    let matrizAntiguedadBolsa = {};
+    let matrizActividadesTecnicos = {};
+    let setActividadesList = new Set();
 
     try {
         if(localStorage.getItem('bdi_v15')) bdiMap = JSON.parse(localStorage.getItem('bdi_v15'));
@@ -334,7 +378,7 @@
             let resSip = await fetch(urlSiprem);
             if(resSip.ok) {
                 let abSip = await resSip.arrayBuffer();
-                let wbSip = XLSX.read(new Uint8Array(abSip), {type:'array'});
+                let wbSip = XLSX.read(new Uint8Array(abSip), {range: 4, defval:""});
                 let rowsSip = XLSX.utils.sheet_to_json(wbSip.Sheets[wbSip.SheetNames[0]], {range: 4, defval:""});
                 rawSipremData = rowsSip;
                 
@@ -445,7 +489,6 @@
         return coincidencia ? bdiMap[coincidencia] : "SIN NUCLEO";
     }
 
-    // MEJORA: Clasificación extendida para incluir TO154, TO157 y otros tipos de Nuevas Conexiones
     function clasificarProceso(to, desc, nat) {
         let m = U(to + " " + desc + " " + nat);
         if(m.includes("TO811") || m.includes("DAÑO") || m.includes("DANO")) return "DAÑOS";
@@ -464,7 +507,18 @@
         listadoSinNucleo = [];
         mapaAsignacionesTecnicos = {};
         tecnicosObj = {}; 
+        baseMinableData = [];
         conteoTotalProceso = { "DAÑOS":0, "CAMPAÑAS":0, "NUEVAS CONEXIONES":0, "PQR":0 };
+
+        matrizAntiguedadBolsa = {
+            "CAMPAÑAS": { "1":0, "2":0, "3":0, "4":0, "5~9":0, "10~20":0, ">20":0, "total":0 },
+            "PQR": { "1":0, "2":0, "3":0, "4":0, "5~9":0, "10~20":0, ">20":0, "total":0 },
+            "DAÑOS": { "1":0, "2":0, "3":0, "4":0, "5~9":0, "10~20":0, ">20":0, "total":0 },
+            "NUEVAS CONEXIONES": { "1":0, "2":0, "3":0, "4":0, "5~9":0, "10~20":0, ">20":0, "total":0 }
+        };
+
+        matrizActividadesTecnicos = {};
+        setActividadesList = new Set();
 
         rows.forEach(row => {
             let r = {};
@@ -491,21 +545,38 @@
             let ing = buscarIngenieroSoftMatch(barrio);
             
             let traba = casuisticaMap.get(osClean) || "";
-            
-            if(traba) {
+            let esTrabada = !!traba;
+
+            if(esTrabada) {
                 trabadas++;
                 let keyC = `${barrio}|${traba}|${to}`;
                 if(!datosCasuisticaTbl[keyC]) datosCasuisticaTbl[keyC] = { b: barrio, m: traba, to: to || "S/T", c: 0, maxAnt: 0, osList: [] };
                 datosCasuisticaTbl[keyC].c++;
                 if(ant > datosCasuisticaTbl[keyC].maxAnt) datosCasuisticaTbl[keyC].maxAnt = ant;
                 datosCasuisticaTbl[keyC].osList.push(os);
-            } 
-            else if(esAsignada) {
+            }
+
+            // MEJORA CLAVE: Si está ASIGNADA, siempre entra a Brigada y Top 15 (así tenga casuística)
+            if(esAsignada) {
                 asignadas++;
-                let registroOrden = { os: os, tec: tecRaw, municipio: mun, barrio: barrio, ant: ant, to: to, descTo: dic.desc, coment: comentario, proceso: proceso };
+                let registroOrden = { 
+                    os: os, 
+                    tec: tecRaw, 
+                    municipio: mun, 
+                    barrio: barrio, 
+                    ant: ant, 
+                    to: to, 
+                    descTo: dic.desc, 
+                    coment: comentario, 
+                    proceso: proceso,
+                    traba: traba
+                };
+
                 top15Listas[proceso].push(registroOrden);
+
                 if(!mapaAsignacionesTecnicos[tecRaw]) mapaAsignacionesTecnicos[tecRaw] = [];
                 mapaAsignacionesTecnicos[tecRaw].push(registroOrden);
+
                 if(!tecnicosObj[tecRaw]) tecnicosObj[tecRaw] = { pqr:0, camp:0, dan:0, nvc:0, tot:0, max:0 };
                 tecnicosObj[tecRaw].tot++;
                 if(ant > tecnicosObj[tecRaw].max) tecnicosObj[tecRaw].max = ant;
@@ -513,19 +584,64 @@
                 if(proceso === "CAMPAÑAS") tecnicosObj[tecRaw].camp++;
                 if(proceso === "DAÑOS") tecnicosObj[tecRaw].dan++;
                 if(proceso === "NUEVAS CONEXIONES") tecnicosObj[tecRaw].nvc++;
+
+                // Registro Matriz Actividades
+                let descClean = dic.desc || to || "OTRA ACTIVIDAD";
+                setActividadesList.add(descClean);
+                if(!matrizActividadesTecnicos[tecRaw]) matrizActividadesTecnicos[tecRaw] = {};
+                matrizActividadesTecnicos[tecRaw][descClean] = (matrizActividadesTecnicos[tecRaw][descClean] || 0) + 1;
             } 
-            else {
+            else if(!esTrabada) {
+                // Bolsa Limpia Disponible (Sin asignación y Sin traba)
                 limpias++;
                 let keyL = `${mun}|${barrio}|${proceso}|${dic.desc}`;
                 if(!datosDisponiblesLimpias[keyL]) datosDisponiblesLimpias[keyL] = { m: mun, b: barrio, p: proceso, d: dic.desc, c: 0, maxAnt: 0, osList: [] };
                 datosDisponiblesLimpias[keyL].c++;
                 if(ant > datosDisponiblesLimpias[keyL].maxAnt) datosDisponiblesLimpias[keyL].maxAnt = ant;
                 datosDisponiblesLimpias[keyL].osList.push(os);
+
+                // Matriz de Antigüedad para la Bolsa Limpia
+                let bK = "1";
+                if(ant === 1) bK = "1";
+                else if(ant === 2) bK = "2";
+                else if(ant === 3) bK = "3";
+                else if(ant === 4) bK = "4";
+                else if(ant >= 5 && ant <= 9) bK = "5~9";
+                else if(ant >= 10 && ant <= 20) bK = "10~20";
+                else bK = ">20";
+
+                if(matrizAntiguedadBolsa[proceso]) {
+                    matrizAntiguedadBolsa[proceso][bK]++;
+                    matrizAntiguedadBolsa[proceso]["total"]++;
+                }
+
+                // Actividades No Asignadas
+                let descClean = dic.desc || to || "OTRA ACTIVIDAD";
+                setActividadesList.add(descClean);
+                if(!matrizActividadesTecnicos["No asignado"]) matrizActividadesTecnicos["No asignado"] = {};
+                matrizActividadesTecnicos["No asignado"][descClean] = (matrizActividadesTecnicos["No asignado"][descClean] || 0) + 1;
             }
 
             if(!nucleosObj[ing]) nucleosObj[ing] = 0;
             nucleosObj[ing]++;
             if(ing === "SIN NUCLEO") listadoSinNucleo.push({ "OS": os, "Municipio": mun, "Barrio": barrio, "Proceso": proceso, "Técnico": tecRaw });
+
+            // Dataset Minable Completo para Exportación
+            baseMinableData.push({
+                "OS": os,
+                "Municipio": mun,
+                "Barrio": barrio,
+                "Ingeniero_Nucleo": ing,
+                "Tipo_TO": to || "S/T",
+                "Actividad_Descripcion": dic.desc || "S/D",
+                "Proceso_Naturaleza": proceso,
+                "Tecnico_Asignado": tecRaw,
+                "Estado_Asignacion": esAsignada ? "ASIGNADO" : "BOLSA / DISPONIBLE",
+                "Tiene_Traba": esTrabada ? "SI" : "NO",
+                "Motivo_Traba": traba || "NINGUNA",
+                "Antiguedad_Dias": ant,
+                "Comentarios": comentario
+            });
         });
 
         document.getElementById('kpiTotal').innerText = total;
@@ -539,6 +655,8 @@
             selectTech.innerHTML += `<option value="${t}">${t} (${mapaAsignacionesTecnicos[t].length} OS)</option>`;
         });
 
+        renderMatrizAntiguedadBolsa();
+        renderMatrizActividades();
         renderTablerosTop15(top15Listas);
         renderOsLimpias();
         renderCasuisticaTbl(); 
@@ -547,6 +665,109 @@
         filtrarDetalleTecnico();
 
         document.getElementById('dashboardContent').style.display = 'block';
+    }
+
+    // RESUMEN 1: MATRIZ DE ANTIGÜEDAD BOLSA (Imagen 1)
+    function renderMatrizAntiguedadBolsa() {
+        let tbody = document.querySelector('#tableMatrizAntiguedad tbody');
+        let html = "";
+        let tot = { "1":0, "2":0, "3":0, "4":0, "5~9":0, "10~20":0, ">20":0, "total":0 };
+
+        ["CAMPAÑAS", "PQR", "DAÑOS", "NUEVAS CONEXIONES"].forEach(p => {
+            let row = matrizAntiguedadBolsa[p] || { "1":0, "2":0, "3":0, "4":0, "5~9":0, "10~20":0, ">20":0, "total":0 };
+            tot["1"] += row["1"]; tot["2"] += row["2"]; tot["3"] += row["3"]; tot["4"] += row["4"];
+            tot["5~9"] += row["5~9"]; tot["10~20"] += row["10~20"]; tot[">20"] += row[">20"]; tot["total"] += row["total"];
+
+            html += `<tr>
+                <td style="text-align:left; font-weight:bold;">${p}</td>
+                <td>${row["1"] || ''}</td>
+                <td>${row["2"] || ''}</td>
+                <td>${row["3"] || ''}</td>
+                <td>${row["4"] || ''}</td>
+                <td>${row["5~9"] || ''}</td>
+                <td>${row["10~20"] || ''}</td>
+                <td>${row[">20"] || ''}</td>
+                <td style="font-weight:bold; background:#edf2f7;">${row["total"] || 0}</td>
+            </tr>`;
+        });
+
+        html += `<tr class="total-row">
+            <td style="text-align:left;">TOTAL BOLSA</td>
+            <td>${tot["1"]}</td>
+            <td>${tot["2"]}</td>
+            <td>${tot["3"]}</td>
+            <td>${tot["4"]}</td>
+            <td>${tot["5~9"]}</td>
+            <td>${tot["10~20"]}</td>
+            <td>${tot[">20"]}</td>
+            <td>${tot["total"]}</td>
+        </tr>`;
+
+        tbody.innerHTML = html;
+    }
+
+    // RESUMEN 2: MATRIZ DE ACTIVIDADES / DESCRIPCIÓN POR TÉCNICO (Imagen 2)
+    function renderMatrizActividades() {
+        let thead = document.querySelector('#tableMatrizActividades thead');
+        let tbody = document.querySelector('#tableMatrizActividades tbody');
+
+        let actArray = Array.from(setActividadesList).sort();
+        if(actArray.length === 0) {
+            thead.innerHTML = ""; tbody.innerHTML = "<tr><td style='text-align:center;'>Sin información</td></tr>"; return;
+        }
+
+        let headerHtml = `<tr><th style="text-align:left; min-width:180px;">TÉCNICO / BRIGADA</th>`;
+        actArray.forEach(act => {
+            headerHtml += `<th style="min-width:110px; font-size:9.5px;" title="${act}">${act.substring(0,25)}</th>`;
+        });
+        headerHtml += `<th style="min-width:60px;">TOTAL</th></tr>`;
+        thead.innerHTML = headerHtml;
+
+        let techList = Object.keys(matrizActividadesTecnicos).sort();
+        // Colocar "No asignado" al principio si existe
+        if(techList.includes("No asignado")) {
+            techList = ["No asignado", ...techList.filter(t => t !== "No asignado")];
+        }
+
+        let colTotals = {};
+        actArray.forEach(a => colTotals[a] = 0);
+        let grandTotal = 0;
+
+        let bodyHtml = "";
+        techList.forEach(tech => {
+            let rowTotal = 0;
+            let isNoAsig = tech === "No asignado";
+            bodyHtml += `<tr ${isNoAsig ? 'style="background:#fff5f5; font-weight:bold;"' : ''}>
+                <td style="text-align:left; ${isNoAsig ? 'color:#c53030;' : ''}">${tech}</td>`;
+
+            actArray.forEach(act => {
+                let cnt = matrizActividadesTecnicos[tech][act] || 0;
+                rowTotal += cnt;
+                colTotals[act] += cnt;
+                bodyHtml += `<td>${cnt > 0 ? cnt : ''}</td>`;
+            });
+
+            grandTotal += rowTotal;
+            bodyHtml += `<td style="font-weight:bold; background:#edf2f7;">${rowTotal}</td></tr>`;
+        });
+
+        bodyHtml += `<tr class="total-row">
+            <td style="text-align:left;">TOTAL GENERAL</td>`;
+        actArray.forEach(act => {
+            bodyHtml += `<td>${colTotals[act]}</td>`;
+        });
+        bodyHtml += `<td>${grandTotal}</td></tr>`;
+
+        tbody.innerHTML = bodyHtml;
+    }
+
+    // EXPORTACIÓN BASE MINABLE COMPLETA
+    function exportarBaseMinableCompleta() {
+        if(!baseMinableData || baseMinableData.length === 0) return alert("❌ No hay datos cargados para exportar.");
+        let ws = XLSX.utils.json_to_sheet(baseMinableData);
+        let wb = XLSX.utils.book_new(); 
+        XLSX.utils.book_append_sheet(wb, ws, "Base_Minable_OS");
+        XLSX.writeFile(wb, `BASE_MINABLE_DELTEC_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
     function renderTecnicosTbl() {
@@ -568,7 +789,7 @@
 
         data.sort((a,b) => b.tot - a.tot);
         let html = data.map(t => `<tr>
-            <td><b>${t.nombre}</b></td>
+            <td style="text-align:left;"><b>${t.nombre}</b></td>
             <td>${t.pqr > 0 && filtro==="PQR" ? `<span class="badge badge-blue">${t.pqr}</span>` : t.pqr}</td>
             <td>${t.camp > 0 && filtro==="CAMPAÑAS" ? `<span class="badge badge-blue">${t.camp}</span>` : t.camp}</td>
             <td>${t.dan > 0 && filtro==="DAÑOS" ? `<span class="badge badge-blue">${t.dan}</span>` : t.dan}</td>
@@ -587,7 +808,7 @@
             let ordenes = mapaAsignacionesTecnicos[tec];
             ordenes.forEach(o => {
                 if (filtro === "TODOS" || o.proceso === filtro) {
-                    dataToExport.push({ "Técnico": o.tec, "Proceso": o.proceso, "OS": o.os, "Municipio": o.municipio, "Barrio": o.barrio, "Código TO": o.to, "Actividad": o.descTo, "Días": o.ant, "Comentarios": o.coment });
+                    dataToExport.push({ "Técnico": o.tec, "Proceso": o.proceso, "OS": o.os, "Municipio": o.municipio, "Barrio": o.barrio, "Código TO": o.to, "Actividad": o.descTo, "Días": o.ant, "Traba": o.traba || "NINGUNA", "Comentarios": o.coment });
                 }
             });
         }
@@ -616,7 +837,7 @@
         if(!tec) {
             document.getElementById('txtNombreTecnicoCaptura').innerText = "TÉCNICO: NO SELECCIONADO";
             document.getElementById('txtKpisTecnicoCaptura').innerText = "OS Totales: 0 | Max Antigüedad: 0d";
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#a0aec0; padding:15px;">Selecciona una cuadrilla</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#a0aec0; padding:15px;">Selecciona una cuadrilla</td></tr>`;
             return;
         }
         let lista = [...mapaAsignacionesTecnicos[tec]].sort((a,b) => b.ant - a.ant);
@@ -624,17 +845,20 @@
         document.getElementById('txtNombreTecnicoCaptura').innerText = `👷 REPORTE: ${tec}`;
         document.getElementById('txtKpisTecnicoCaptura').innerText = `OS Totales: ${lista.length} | Max Antigüedad: ${maxAnt} días`;
         tbody.innerHTML = lista.map(o => `<tr>
-            <td><b>${o.os}</b></td><td>${o.municipio}</td><td><b>${o.barrio}</b></td>
+            <td style="text-align:left;"><b>${o.os}</b></td>
+            <td>${o.municipio}</td>
+            <td style="text-align:left;"><b>${o.barrio}</b></td>
             <td><span class="badge badge-dark">${o.to}</span><br><small style="font-size:9px;">${o.descTo.substring(0,20)}</small></td>
             <td><span class="badge ${o.ant >= 5 ? 'badge-red' : 'badge-green'}">${o.ant} d</span></td>
-            <td style="white-space: normal; word-break: break-word; font-size:10px; max-width:250px;">${o.coment}</td>
+            <td>${o.traba ? `<span class="badge badge-red">⚠️ ${o.traba}</span>` : `<span class="badge badge-green">OK</span>`}</td>
+            <td style="white-space: normal; word-break: break-word; font-size:10px; max-width:250px; text-align:left;">${o.coment}</td>
         </tr>`).join("");
     }
 
     function exportarExcelTecnicoIndividual() {
         let tec = document.getElementById('selectTecnicoFiltro').value;
         if(!tec) return alert("❌ Selecciona una cuadrilla primero.");
-        let ws = XLSX.utils.json_to_sheet(mapaAsignacionesTecnicos[tec].map(o => ({ "OS": o.os, "Municipio": o.municipio, "Barrio": o.barrio, "TO": o.to, "Actividad": o.descTo, "Días": o.ant, "Comentario": o.coment })));
+        let ws = XLSX.utils.json_to_sheet(mapaAsignacionesTecnicos[tec].map(o => ({ "OS": o.os, "Municipio": o.municipio, "Barrio": o.barrio, "TO": o.to, "Actividad": o.descTo, "Días": o.ant, "Traba": o.traba || "NINGUNA", "Comentario": o.coment })));
         let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Asignaciones");
         XLSX.writeFile(wb, `OS_${tec.replace(/[^A-Z0-9]/gi, '_')}.xlsx`);
     }
@@ -666,8 +890,10 @@
             } else {
                 data.forEach(item => {
                     let textClass = item.ant >= 5 ? 'color: #e53e3e;' : (item.ant > 2 ? 'color: #d69e2e;' : 'color: #38a169;');
+                    let trabaBadge = item.traba ? `<br><span class="badge badge-red" style="font-size:8px; padding:1px 3px;" title="${item.traba}">⚠️ ${item.traba.substring(0,12)}..</span>` : '';
+                    
                     html += `<tr>
-                                <td style="font-weight:bold; color:var(--text);">${item.os}</td>
+                                <td style="font-weight:bold; color:var(--text);">${item.os}${trabaBadge}</td>
                                 <td style="font-size:9.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:70px;" title="${item.barrio}">${item.barrio}</td>
                                 <td style="font-size:9.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px;" title="${item.tec}">${item.tec}</td>
                                 <td style="font-weight:bold; ${textClass}">${item.ant} d</td>
@@ -679,7 +905,6 @@
         });
     }
 
-    // MEJORA: Se agregó la columna Antigüedad (Días)
     function renderOsLimpias() {
         let f = document.getElementById('filtroOsLimpias').value;
         let tbody = document.querySelector('#tableDisponibles tbody');
@@ -688,9 +913,9 @@
             let osText = x.osList.slice(0, 3).join(", ") + (x.osList.length > 3 ? "..." : "");
             let badgeAnt = x.maxAnt >= 5 ? 'badge-red' : (x.maxAnt > 2 ? 'badge-yellow' : 'badge-green');
             html += `<tr>
-                <td>${x.m}<br><b>${x.b}</b></td>
-                <td><span class="badge badge-blue">${x.p}</span><br><small>${x.d.substring(0,25)}</small></td>
-                <td class="col-os">${osText}</td>
+                <td style="text-align:left;">${x.m}<br><b>${x.b}</b></td>
+                <td style="text-align:left;"><span class="badge badge-blue">${x.p}</span><br><small>${x.d.substring(0,25)}</small></td>
+                <td class="col-os" style="text-align:left;">${osText}</td>
                 <td><span class="badge ${badgeAnt}">${x.maxAnt} d</span></td>
                 <td><b>${x.c}</b></td>
             </tr>`;
@@ -712,17 +937,16 @@
         XLSX.writeFile(wb, `Bolsa_OS_Limpias_${f}.xlsx`);
     }
 
-    // MEJORA: Se agregaron las columnas Tipo (TO) y Antigüedad (Días)
     function renderCasuisticaTbl() {
         let tbody = document.querySelector('#tableCasuistica tbody');
         let html = Object.values(datosCasuisticaTbl).sort((a,b)=>b.c - a.c).map(x => {
             let osText = x.osList.slice(0, 3).join(", ") + (x.osList.length > 3 ? "..." : "");
             let badgeAnt = x.maxAnt >= 5 ? 'badge-red' : (x.maxAnt > 2 ? 'badge-yellow' : 'badge-green');
             return `<tr>
-                <td><b>${x.b}</b></td>
+                <td style="text-align:left;"><b>${x.b}</b></td>
                 <td><span class="badge badge-dark">${x.to}</span></td>
-                <td style="color:var(--accent); font-weight:bold;">${x.m}</td>
-                <td class="col-os">${osText}</td>
+                <td style="color:var(--accent); font-weight:bold; text-align:left;">${x.m}</td>
+                <td class="col-os" style="text-align:left;">${osText}</td>
                 <td><span class="badge ${badgeAnt}">${x.maxAnt} d</span></td>
                 <td><span class="badge badge-red">${x.c}</span></td>
             </tr>`;
@@ -745,7 +969,7 @@
 
     function renderNucleosTbl() {
         let tbody = document.querySelector('#tableCampanasIng tbody');
-        let html = Object.keys(nucleosObj).sort((a,b)=>nucleosObj[b]-nucleosObj[a]).map(k => `<tr><td style="font-weight:bold;">${k === 'SIN NUCLEO' ? '⚠️ SIN NUCLEO ASIGNADO' : k}</td><td><span class="badge ${k==='SIN NUCLEO'?'badge-red':'badge-blue'}">${nucleosObj[k]} OS</span></td></tr>`).join("");
+        let html = Object.keys(nucleosObj).sort((a,b)=>nucleosObj[b]-nucleosObj[a]).map(k => `<tr><td style="font-weight:bold; text-align:left;">${k === 'SIN NUCLEO' ? '⚠️ SIN NUCLEO ASIGNADO' : k}</td><td><span class="badge ${k==='SIN NUCLEO'?'badge-red':'badge-blue'}">${nucleosObj[k]} OS</span></td></tr>`).join("");
         tbody.innerHTML = html;
     }
 
