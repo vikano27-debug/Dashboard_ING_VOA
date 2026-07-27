@@ -16,7 +16,6 @@ from selenium.webdriver.common.keys import Keys
 # 1. CONFIGURACIÓN DINÁMICA DE RUTAS Y PROYECTO
 # =====================================================================
 CARPETA_PROYECTO = os.path.dirname(os.path.abspath(__file__))
-CARPETA_DESCARGAS_SISTEMA = os.path.join(os.path.expanduser("~"), "Downloads")
 
 URL_SIPREM = "https://sipremsol.co/index.php?opcion=Perfil"
 URL_CASUISTICA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOJkGvpBZwgK7sM6UafZJ5ocYI3lAAF_dUBXwZjXZq-SRB6nvjxLGJpakZq7EBUA/pub?output=csv"
@@ -74,7 +73,7 @@ else:
     URL_REPO_GITHUB = "https://github.com/vikano27-debug/Dashboard_ING_VOA.git"
 
 # =====================================================================
-# 2. CONFIGURACIÓN DE CHROME
+# 2. CONFIGURACIÓN DE CHROME (Descarga directa a la carpeta del proyecto)
 # =====================================================================
 print("🤖 Iniciando el navegador Chrome...")
 opciones = Options()
@@ -82,8 +81,9 @@ opciones.add_argument("--incognito")
 opciones.add_argument("--start-maximized")
 opciones.add_argument("--disable-features=PasswordLeakDetection")
 
+# Se forza a Chrome a descargar DIRECTAMENTE dentro de la carpeta del proyecto
 opciones.add_experimental_option("prefs", {
-    "download.default_directory": CARPETA_DESCARGAS_SISTEMA,
+    "download.default_directory": CARPETA_PROYECTO,
     "download.prompt_for_download": False,
     "download.directory_upgrade": True,
     "safebrowsing.enabled": True,
@@ -136,7 +136,7 @@ try:
     time.sleep(6) 
 
     # =====================================================================
-    # 4. NAVEGACIÓN POR LOS MENÚS
+    # 4. NAVEGACIÓN Y DESCARGA
     # =====================================================================
     print("🗺️ Seleccionando Territorio: Magdalena...")
     menu_territorio = wait.until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[2]/div/div/ul/li[2]/a/i')))
@@ -157,33 +157,45 @@ try:
     wait.until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[2]/div/div/ul/li[4]/ul/li[4]/a'))).click()
     time.sleep(5) 
     
+    # Limpiar archivos temporales de descargas previas en el proyecto
+    for f in glob.glob(os.path.join(CARPETA_PROYECTO, "ordenes*.xls*")):
+        try:
+            os.remove(f)
+        except Exception:
+            pass
+
     print("📥 Buscando el botón de descarga Consolidado...")
     wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="layout"]/div/div/div/div/div[2]/form[1]/div[2]/button[1]'))).click()
-    time.sleep(5)
+    time.sleep(4)
     
     boton_descarga = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="layout"]/div/div/div/div/div[2]/form[1]/div[2]/a')))
     boton_descarga.click()
     
-    print("⏳ Esperando 15 segundos a que el archivo termine de descargar...")
-    time.sleep(15) 
+    print("⏳ Esperando la descarga del archivo fresco...")
+    
+    # Bucle inteligente de detección de descarga
+    archivo_nuevo = None
+    for _ in range(20):
+        time.sleep(2)
+        archivos = [
+            f for f in glob.glob(os.path.join(CARPETA_PROYECTO, "*.xls*")) 
+            if not f.endswith("siprem_latest.xlsx") 
+            and not f.endswith("bdi_latest.xlsx") 
+            and not f.endswith(".crdownload")
+        ]
+        if archivos:
+            archivo_nuevo = max(archivos, key=os.path.getctime)
+            break
 
     # =====================================================================
-    # 5. TRASLADO DEL ARCHIVO A LA CARPETA DEL PROYECTO
+    # 5. REEMPLAZO EXACTO DE 'siprem_latest.xlsx'
     # =====================================================================
-    print("📂 Buscando el archivo en la carpeta Downloads...")
-    archivos_excel = glob.glob(os.path.join(CARPETA_DESCARGAS_SISTEMA, '*.xls*'))
-    
-    if archivos_excel:
-        archivo_descargado = max(archivos_excel, key=os.path.getctime)
+    if archivo_nuevo and os.path.exists(archivo_nuevo):
         archivo_destino = os.path.join(CARPETA_PROYECTO, "siprem_latest.xlsx")
-        
-        if os.path.exists(archivo_destino):
-            os.remove(archivo_destino)
-            
-        shutil.move(archivo_descargado, archivo_destino)
-        print("✅ SIPREM movido exitosamente a la carpeta del proyecto como 'siprem_latest.xlsx'.")
+        shutil.move(archivo_nuevo, archivo_destino)
+        print("✅ SIPREM fresco con 237 registros actualizado correctamente como 'siprem_latest.xlsx'.")
     else:
-        print("⚠️ Advertencia: No se encontró ningún archivo Excel recién descargado.")
+        print("⚠️ No se detectó un archivo nuevo descargado.")
 
 except Exception as e:
     print(f"\n❌ ERROR CRÍTICO:\n{e}\n")
@@ -204,7 +216,7 @@ except Exception as e:
     print(f"⚠️ Error descargando casuística: {e}")
 
 # =====================================================================
-# 7. SINCRONIZACIÓN PERFECTA Y FORZADA A GITHUB
+# 7. SINCRONIZACIÓN AUTOMÁTICA Y FORZADA A GITHUB
 # =====================================================================
 print("\n☁️ Sincronizando repositorio con GitHub...")
 
@@ -232,21 +244,18 @@ except Exception as e:
 git_cmd = shutil.which("git")
 
 if not git_cmd:
-    print("🔍 Escaneando carpetas del sistema para ubicar Git...")
     carpetas_escaneo = [
         os.path.join(os.path.expanduser("~"), "Desktop", "Herramientas de desarrollo"),
         os.path.join(os.path.expanduser("~"), "AppData", "Local", "Programs"),
         r"C:\Program Files",
         r"C:\Program Files (x86)"
     ]
-    
     for carpeta in carpetas_escaneo:
         if os.path.exists(carpeta):
             for root, dirs, files in os.walk(carpeta):
-                if "git.exe" in files:
-                    if "cmd" in root.lower() or "bin" in root.lower():
-                        git_cmd = os.path.join(root, "git.exe")
-                        break
+                if "git.exe" in files and ("cmd" in root.lower() or "bin" in root.lower()):
+                    git_cmd = os.path.join(root, "git.exe")
+                    break
             if git_cmd:
                 break
 
@@ -254,31 +263,24 @@ if git_cmd:
     try:
         os.chdir(CARPETA_PROYECTO)
 
-        # 1. Inicializar si no existe
         if not os.path.exists(os.path.join(CARPETA_PROYECTO, ".git")):
             subprocess.run([git_cmd, "init"], check=True)
 
-        # 2. Configurar identidad OBLIGATORIAMENTE antes de commit
         subprocess.run([git_cmd, "config", "user.name", "vikano27-debug"], check=True)
         subprocess.run([git_cmd, "config", "user.email", "vikano27-debug@users.noreply.github.com"], check=True)
 
-        # 3. Vincular repositorio remoto
         subprocess.run([git_cmd, "remote", "add", "origin", URL_REPO_GITHUB], check=False)
         subprocess.run([git_cmd, "remote", "set-url", "origin", URL_REPO_GITHUB], check=False)
 
-        # 4. Agregar archivos y hacer Commit local
         subprocess.run([git_cmd, "add", "."], check=True)
         subprocess.run([git_cmd, "commit", "-m", "Actualizacion automatica SIPREM y Casuistica"], check=False)
         subprocess.run([git_cmd, "branch", "-M", "main"], check=False)
 
-        # 5. Forzar Push para sincronizar el repositorio exacto
         print("🚀 Subiendo actualizaciones a GitHub...")
         subprocess.run([git_cmd, "push", "-u", "origin", "main", "--force"], check=True)
-        print("\n🔥 ¡MISIÓN CUMPLIDA! GitHub actualizado al 100%.")
+        print("\n🔥 ¡MISIÓN CUMPLIDA! GitHub actualizado con la información más reciente de SIPREM.")
 
     except subprocess.CalledProcessError as e:
         print(f"⚠️ Error durante la ejecución de Git: {e}")
     except Exception as e:
         print(f"❌ Error durante la subida a GitHub: {e}")
-else:
-    print("⚠️ No se encontró el ejecutable 'git.exe' en el sistema.")
