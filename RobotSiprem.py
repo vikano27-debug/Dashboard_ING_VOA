@@ -16,6 +16,7 @@ from selenium.webdriver.common.keys import Keys
 # 1. CONFIGURACIÓN DINÁMICA DE RUTAS Y PROYECTO
 # =====================================================================
 CARPETA_PROYECTO = os.path.dirname(os.path.abspath(__file__))
+CARPETA_DOWNLOADS_GENERAL = os.path.join(os.path.expanduser("~"), "Downloads")
 
 URL_SIPREM = "https://sipremsol.co/index.php?opcion=Perfil"
 URL_CASUISTICA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOJkGvpBZwgK7sM6UafZJ5ocYI3lAAF_dUBXwZjXZq-SRB6nvjxLGJpakZq7EBUA/pub?output=csv"
@@ -73,7 +74,7 @@ else:
     URL_REPO_GITHUB = "https://github.com/vikano27-debug/Dashboard_ING_VOA.git"
 
 # =====================================================================
-# 2. CONFIGURACIÓN DE CHROME (Descarga directa a la carpeta del proyecto)
+# 2. CONFIGURACIÓN DE CHROME (Modo Incógnito + Forzado CDP)
 # =====================================================================
 print("🤖 Iniciando el navegador Chrome...")
 opciones = Options()
@@ -81,17 +82,21 @@ opciones.add_argument("--incognito")
 opciones.add_argument("--start-maximized")
 opciones.add_argument("--disable-features=PasswordLeakDetection")
 
-# Se forza a Chrome a descargar DIRECTAMENTE dentro de la carpeta del proyecto
 opciones.add_experimental_option("prefs", {
     "download.default_directory": CARPETA_PROYECTO,
     "download.prompt_for_download": False,
     "download.directory_upgrade": True,
-    "safebrowsing.enabled": True,
-    "credentials_enable_service": False,
-    "profile.password_manager_enabled": False
+    "safebrowsing.enabled": True
 })
 
 driver = webdriver.Chrome(options=opciones)
+
+# Forzar descarga en la carpeta del proyecto vía CDP para Incógnito
+driver.execute_cdp_cmd("Page.setDownloadBehavior", {
+    "behavior": "allow",
+    "downloadPath": CARPETA_PROYECTO
+})
+
 acciones = ActionChains(driver)
 
 try:
@@ -156,35 +161,46 @@ try:
     time.sleep(3)
     wait.until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[2]/div/div/ul/li[4]/ul/li[4]/a'))).click()
     time.sleep(5) 
-    
-    # Limpiar archivos temporales de descargas previas en el proyecto
-    for f in glob.glob(os.path.join(CARPETA_PROYECTO, "ordenes*.xls*")):
-        try:
-            os.remove(f)
-        except Exception:
-            pass
+
+    # Limpiar temporales antiguos en ambas carpetas
+    for ruta_limpia in [CARPETA_PROYECTO, CARPETA_DOWNLOADS_GENERAL]:
+        for f in glob.glob(os.path.join(ruta_limpia, "ordenes*.xls*")):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
 
     print("📥 Buscando el botón de descarga Consolidado...")
     wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="layout"]/div/div/div/div/div[2]/form[1]/div[2]/button[1]'))).click()
-    time.sleep(4)
+    time.sleep(5)
     
     boton_descarga = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="layout"]/div/div/div/div/div[2]/form[1]/div[2]/a')))
     boton_descarga.click()
     
     print("⏳ Esperando la descarga del archivo fresco...")
     
-    # Bucle inteligente de detección de descarga
+    # Bucle inteligente de detección en AMBAS carpetas
     archivo_nuevo = None
-    for _ in range(20):
+    for _ in range(15):
         time.sleep(2)
-        archivos = [
+        candidatos = []
+        
+        # 1. Buscar en carpeta del proyecto
+        candidatos += [
             f for f in glob.glob(os.path.join(CARPETA_PROYECTO, "*.xls*")) 
             if not f.endswith("siprem_latest.xlsx") 
             and not f.endswith("bdi_latest.xlsx") 
             and not f.endswith(".crdownload")
         ]
-        if archivos:
-            archivo_nuevo = max(archivos, key=os.path.getctime)
+        
+        # 2. Buscar en Downloads general
+        candidatos += [
+            f for f in glob.glob(os.path.join(CARPETA_DOWNLOADS_GENERAL, "ordenes*.xls*")) 
+            if not f.endswith(".crdownload")
+        ]
+        
+        if candidatos:
+            archivo_nuevo = max(candidatos, key=os.path.getctime)
             break
 
     # =====================================================================
@@ -193,7 +209,7 @@ try:
     if archivo_nuevo and os.path.exists(archivo_nuevo):
         archivo_destino = os.path.join(CARPETA_PROYECTO, "siprem_latest.xlsx")
         shutil.move(archivo_nuevo, archivo_destino)
-        print("✅ SIPREM fresco con 237 registros actualizado correctamente como 'siprem_latest.xlsx'.")
+        print("✅ SIPREM fresco actualizado exitosamente como 'siprem_latest.xlsx'.")
     else:
         print("⚠️ No se detectó un archivo nuevo descargado.")
 
